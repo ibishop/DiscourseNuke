@@ -9,6 +9,9 @@ venv/
 .env
 .session
 
+# Pulled feed data (may contain private timeline)
+timeline_cache.json
+
 # IDE
 .idea/
 

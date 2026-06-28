@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import argparse
 
-from bluesky import Post, get_author_feed
+from bluesky import Post, get_author_feed, get_timeline
 from classifier import PoliticalClassifier
 
 SAMPLE_FEED = [
@@ -34,7 +34,9 @@ def truncate(text: str, n: int = 90) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Nuke US political discourse from a Bluesky feed.")
-    ap.add_argument("--actor", help="Bluesky handle or DID to pull. Omit to use sample feed.")
+    ap.add_argument("--actor", help="Pull a specific user's public author feed.")
+    ap.add_argument("--timeline", action="store_true", help="Pull your authenticated home timeline.")
+    ap.add_argument("--sample", action="store_true", help="Use the built-in offline sample feed.")
     ap.add_argument("--limit", type=int, default=50, help="Max posts to pull.")
     ap.add_argument("--threshold", type=float, default=0.05, help="Political margin threshold.")
     ap.add_argument("--show-kept", action="store_true", help="Also print kept (non-political) posts.")
@@ -43,9 +45,15 @@ def main() -> None:
     if args.actor:
         print(f"Pulling up to {args.limit} posts from @{args.actor} ...")
         posts = get_author_feed(args.actor, limit=args.limit)
-    else:
-        print("No --actor given; using built-in sample feed.")
+    elif args.sample:
+        print("Using built-in sample feed.")
         posts = SAMPLE_FEED
+    else:  # default: authenticated home timeline
+        from auth import get_client
+
+        print(f"Pulling up to {args.limit} posts from your home timeline ...")
+        client = get_client()
+        posts = get_timeline(client, limit=args.limit)
 
     print(f"Loaded {len(posts)} posts. Loading model + classifying ...\n")
 
