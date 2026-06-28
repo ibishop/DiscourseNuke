@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Secrets / session
+.env
+.session
+
+# IDE
+.idea/
+
+# Model cache (sentence-transformers downloads)
+.cache/
+
+# OS
+.DS_Store
