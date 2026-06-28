@@ -41,32 +41,32 @@ FINANCE_SEEDS = [
     "Bitcoin and crypto prices fluctuated sharply.",
 ]
 
-# Domain-general: factual event reporting.
+# Domain-general: ATTRIBUTED / sourced reporting of an event ("NYT says X").
 NEWS_SEEDS = [
-    "Company announced a new product today.",
-    "Officials released a report showing the latest figures.",
-    "The agency said it would take new action.",
-    "Prices rose by ten percent according to new data.",
-    "A new study was published with these findings.",
-    "Breaking: the deal was finalized after months of talks.",
-    "Regulators approved the proposal in a vote.",
-    "The quarterly results came in above expectations.",
-    "A court issued a ruling on the matter today.",
-    "The organization launched the initiative this week.",
+    "The New York Times reports that the policy was overturned.",
+    "According to Reuters, officials announced new measures today.",
+    "Breaking: the court has issued its ruling in the case.",
+    "Sources say the company will lay off thousands of workers.",
+    "Bloomberg reports the central bank raised interest rates again.",
+    "Officials announced the change in a statement this morning.",
+    "A new report finds that prices rose four percent last month.",
+    "The senator introduced the bill on the floor today.",
+    "Data released today shows unemployment fell to a new low.",
+    "The AP confirms the deal was finalized after months of talks.",
 ]
 
-# Domain-general: SUBSTANTIVE opinion / analysis / argument about a subject.
+# Domain-general: personal REACTION / opinion ("I can't believe X happened").
 COMMENTARY_SEEDS = [
-    "I think this policy will backfire, and here is the reason why.",
-    "The fundamental problem with this approach is the incentives it creates.",
-    "This ruling sets a dangerous precedent for the years ahead.",
-    "My read is that the market has gotten this completely wrong.",
-    "What everyone is missing is the structural cause behind this.",
-    "The argument that this will work does not hold up to scrutiny.",
-    "This is overhyped and will not live up to the expectations.",
-    "The strategy here is misguided and likely to fail.",
-    "This reflects a deeper problem with how the institution operates.",
-    "The real lesson is that we keep repeating the same mistake.",
+    "I can't believe this actually happened.",
+    "This is absolutely outrageous and completely unacceptable.",
+    "Honestly this is insane and I am furious about it.",
+    "What a disaster this turned out to be.",
+    "I'm so tired of watching this happen over and over again.",
+    "It's appalling that anyone thinks this is okay.",
+    "I genuinely cannot believe they would do this.",
+    "This is the dumbest decision I have seen in a long time.",
+    "Absolutely shameful. I have no words.",
+    "This makes me so angry, it's exactly what's wrong with everything.",
 ]
 
 # Domain-general: low-content chatter / online-meta / generic replies.

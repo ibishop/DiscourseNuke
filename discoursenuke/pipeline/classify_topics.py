@@ -45,9 +45,14 @@ def main() -> None:
     topic_names = list(TOPICS)
     topic_scores = np.stack([nearest(emb, e.encode(TOPICS[t])) for t in topic_names], axis=1)
     neutral = nearest(emb, e.encode(NEUTRAL_SEEDS))
-    news = nearest(emb, e.encode(NEWS_SEEDS))
-    comm = nearest(emb, e.encode(COMMENTARY_SEEDS))
-    chat = nearest(emb, e.encode(CHATTER_SEEDS))
+    # z-score each type axis: news has much higher absolute similarity than
+    # commentary, so a raw argmax lets news win the middle. Standardizing makes
+    # the three comparable (commentary = reactions can then surface).
+    def zscore(x):
+        return (x - x.mean()) / (x.std() + 1e-9)
+    news = zscore(nearest(emb, e.encode(NEWS_SEEDS)))
+    comm = zscore(nearest(emb, e.encode(COMMENTARY_SEEDS)))
+    chat = zscore(nearest(emb, e.encode(CHATTER_SEEDS)))
 
     best = topic_scores.argmax(axis=1)
     best_score = topic_scores.max(axis=1)
