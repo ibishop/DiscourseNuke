@@ -27,6 +27,32 @@ filtering them out of their feed.
 - Posting or otherwise writing to Bluesky on the user's behalf.
 - Moderating other users' feeds.
 
-## Stack (TBD)
-- Python (PyCharm project).
-- Bluesky / AT Protocol client library (e.g. `atproto`).
+## Stack
+- Python (PyCharm project), venv in `.venv`.
+- `atproto` (Bluesky client), `sentence-transformers` (embeddings), `numpy`, `requests`, `python-dotenv`.
+
+## PoC #1 — embedding classifier (built 2026-06-28)
+Status: **working end-to-end, but not the direction we want to keep.**
+
+What it does:
+- `auth.py` — login with a Bluesky app password, cache the session token to
+  `.session`, resume from it on later runs (token-based storage).
+- `bluesky.py` — pull the authenticated home timeline (`get_timeline`) or any
+  user's public author feed (`get_author_feed`).
+- `classifier.py` — embed each post with `all-MiniLM-L6-v2`, score via
+  nearest-seed cosine against three sets (US-political / foreign-political /
+  neutral), nuke only posts closest to the US-political anchors.
+- `main.py` — pull + classify + show nuked. Flags: `--timeline` (default),
+  `--actor`, `--sample`, `--threshold`, `--show-kept`.
+
+What we learned:
+- Embeddings separate "political vs not" well.
+- A foreign-political seed set adds usable geography: ~333/1000 timeline posts
+  (UK/Canada/EU/etc.) correctly spared while US politics is nuked.
+- Limits: precision tops out at the margin — residual false positives on posts
+  with a faint US lean (e.g. an Apple/AI Bloomberg post, arXiv links), and
+  country-ambiguous fragments are hard. Recall on conversational politics is
+  decent but threshold-sensitive.
+
+Verdict: not quite what we're looking for — revisit the approach.
+(TODO: capture what we *do* want the matching to look like.)
