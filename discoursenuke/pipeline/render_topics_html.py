@@ -19,16 +19,9 @@ from pathlib import Path
 import numpy as np
 
 from .. import config
-from ..classify.embedder import Embedder
-from ..classify.topics import (CHATTER_SEEDS, COMMENTARY_SEEDS, NEUTRAL_SEEDS,
-                               NEWS_SEEDS, TOPICS)
+from ..classify.taxonomy import TYPES, TopicClassifier
 
 OUT = Path("html_view")
-TYPES = ["news", "commentary", "chatter"]
-
-
-def nearest(posts, seeds):
-    return (posts @ seeds.T).max(axis=1)
 
 
 def post_url(author, uri):
@@ -48,39 +41,26 @@ def main() -> None:
 
     emb = np.load(args.emb).astype(np.float32)
     meta = [json.loads(l) for l in Path(args.meta).open(encoding="utf-8")]
-    print(f"Loaded {emb.shape}. Scoring topics + types ...")
+    print(f"Loaded {emb.shape}. Classifying ...")
 
-    e = Embedder(preset="nomic")
-    topic_names = list(TOPICS)
-    topic_scores = np.stack([nearest(emb, e.encode(TOPICS[t])) for t in topic_names], axis=1)
-    neutral = nearest(emb, e.encode(NEUTRAL_SEEDS))
-    # z-score each type axis so commentary (lower absolute sim) competes fairly.
-    def zscore(x):
-        return (x - x.mean()) / (x.std() + 1e-9)
-    news = zscore(nearest(emb, e.encode(NEWS_SEEDS)))
-    comm = zscore(nearest(emb, e.encode(COMMENTARY_SEEDS)))
-    chat = zscore(nearest(emb, e.encode(CHATTER_SEEDS)))
-
-    best = topic_scores.argmax(axis=1)
-    best_score = topic_scores.max(axis=1)
-    is_topic = (best_score - neutral) >= args.threshold
-    type_idx = np.stack([news, comm, chat], axis=1).argmax(axis=1)
+    tax = TopicClassifier(threshold=args.threshold).classify(emb)
+    topic_names = tax.topic_names
 
     cards = []
     counts = {}
-    for ti, t in enumerate(topic_names):
-        for ty in range(3):
-            mask = is_topic & (best == ti) & (type_idx == ty)
-            counts[(t, TYPES[ty])] = int(mask.sum())
-            order = [i for i in np.argsort(-best_score) if mask[i]][: args.per_bucket]
+    for t in topic_names:
+        for ty_name in TYPES:
+            mask = (tax.topic == t) & (tax.type == ty_name)
+            counts[(t, ty_name)] = int(mask.sum())
+            order = [i for i in np.argsort(-tax.topic_score) if mask[i]][: args.per_bucket]
             for i in order:
                 author = html.escape(meta[i].get("author", ""))
                 text = html.escape(meta[i].get("text", "")).replace("\n", " ")
                 url = post_url(meta[i].get("author", ""), meta[i].get("uri", ""))
                 cards.append(
-                    f'<div class="post" data-topic="{t}" data-type="{TYPES[ty]}">'
+                    f'<div class="post" data-topic="{t}" data-type="{ty_name}">'
                     f'<div class="badges"><span class="b topic">{t}</span>'
-                    f'<span class="b type t-{TYPES[ty]}">{TYPES[ty]}</span> '
+                    f'<span class="b type t-{ty_name}">{ty_name}</span> '
                     f'<a class="author" href="https://bsky.app/profile/{author}" target="_blank">@{author}</a> '
                     f'<a class="permalink" href="{url}" target="_blank">↗</a></div>'
                     f'<div class="text">{text}</div></div>'

@@ -1,9 +1,8 @@
-"""General multi-topic classifier over the nomic corpus.
+"""Multi-topic + type classifier over the nomic corpus (CLI summary).
 
-Assigns each post to its nearest topic (us_politics / foreign_politics / ai /
-finance), or neutral if it doesn't beat the neutral seeds by a margin, and adds
-a NEWS vs COMMENTARY type. Prints counts and per-topic samples so AI and finance
-buckets can be eyeballed.
+Assigns each post a topic (us_politics / foreign_politics / ai / finance /
+neutral) and a type (news / commentary / chatter), then prints counts and
+per-topic samples. All scoring lives in classify.taxonomy.
 
 Usage:
     python -m discoursenuke.pipeline.classify_topics --threshold 0.03
@@ -18,69 +17,43 @@ from pathlib import Path
 import numpy as np
 
 from .. import config
-from ..classify.embedder import Embedder
-from ..classify.topics import (CHATTER_SEEDS, COMMENTARY_SEEDS, NEUTRAL_SEEDS,
-                               NEWS_SEEDS, TOPICS)
-
-
-def nearest(posts: np.ndarray, seeds: np.ndarray) -> np.ndarray:
-    return (posts @ seeds.T).max(axis=1)
+from ..classify.taxonomy import TYPES, TopicClassifier
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Multi-topic classifier (nomic).")
     ap.add_argument("--emb", default=str(config.DATA_DIR / "corpus_emb_nomic.npy"))
     ap.add_argument("--meta", default=str(config.DATA_DIR / "corpus_emb_nomic_meta.jsonl"))
-    ap.add_argument("--threshold", type=float, default=0.03,
-                    help="How much the best topic must beat neutral to not be neutral.")
-    ap.add_argument("--show", type=int, default=8)
+    ap.add_argument("--threshold", type=float, default=0.03)
+    ap.add_argument("--show", type=int, default=6)
     args = ap.parse_args()
 
     emb = np.load(args.emb).astype(np.float32)
     meta = [json.loads(l) for l in Path(args.meta).open(encoding="utf-8")]
     texts = [m["text"] for m in meta]
-    print(f"Loaded {emb.shape}. Embedding topic + type seeds with nomic ...")
+    print(f"Loaded {emb.shape}. Classifying ...")
 
-    e = Embedder(preset="nomic")
-    topic_names = list(TOPICS)
-    topic_scores = np.stack([nearest(emb, e.encode(TOPICS[t])) for t in topic_names], axis=1)
-    neutral = nearest(emb, e.encode(NEUTRAL_SEEDS))
-    # z-score each type axis: news has much higher absolute similarity than
-    # commentary, so a raw argmax lets news win the middle. Standardizing makes
-    # the three comparable (commentary = reactions can then surface).
-    def zscore(x):
-        return (x - x.mean()) / (x.std() + 1e-9)
-    news = zscore(nearest(emb, e.encode(NEWS_SEEDS)))
-    comm = zscore(nearest(emb, e.encode(COMMENTARY_SEEDS)))
-    chat = zscore(nearest(emb, e.encode(CHATTER_SEEDS)))
-
-    best = topic_scores.argmax(axis=1)
-    best_score = topic_scores.max(axis=1)
-    is_topic = (best_score - neutral) >= args.threshold
-    # 3-way type axis: news vs substantive commentary vs chatter/filler.
-    type_idx = np.stack([news, comm, chat], axis=1).argmax(axis=1)  # 0 news,1 comm,2 chat
-    TYPES = ["news", "commentary", "chatter"]
+    tax = TopicClassifier(threshold=args.threshold).classify(emb)
 
     n = len(texts)
-    print(f"\nTopic counts (threshold {args.threshold}):")
-    print(f"  {'neutral':<18}: {int((~is_topic).sum()):>6}  ({100*(~is_topic).mean():.1f}%)")
-    for ti, t in enumerate(topic_names):
-        mask = is_topic & (best == ti)
-        parts = " / ".join(f"{TYPES[k]} {int((mask & (type_idx==k)).sum())}" for k in range(3))
+    print(f"\nCategories (threshold {args.threshold}):")
+    neu = int((~tax.is_topic).sum())
+    print(f"  {'neutral':<18}: {neu:>6}  ({100*neu/n:.1f}%)")
+    for t in tax.topic_names:
+        mask = tax.topic == t
+        parts = " / ".join(f"{ty} {int((mask & (tax.type == ty)).sum())}" for ty in TYPES)
         print(f"  {t:<18}: {int(mask.sum()):>6}  ({100*mask.mean():.1f}%)   {parts}")
 
-    def show(ti, type_k, title):
-        # Most-central-to-topic posts of a given type.
-        mask = is_topic & (best == ti) & (type_idx == type_k)
-        order = [i for i in np.argsort(-best_score) if mask[i]][: args.show]
-        print(f"\n=== {title} ===")
+    def show(topic, typ):
+        mask = (tax.topic == topic) & (tax.type == typ)
+        order = [i for i in np.argsort(-tax.topic_score) if mask[i]][: args.show]
+        print(f"\n=== {topic.upper()} {typ.upper()} ===")
         for i in order:
             print(f"  @{meta[i]['author']}: {texts[i][:88].replace(chr(10),' ')}")
 
-    for ti, t in enumerate(topic_names):
-        if t in ("us_politics", "ai"):  # spot-check news vs commentary per topic
-            show(ti, 0, f"{t.upper()} NEWS")
-            show(ti, 1, f"{t.upper()} COMMENTARY")
+    for topic in ("us_politics", "ai"):
+        show(topic, "news")
+        show(topic, "commentary")
 
 
 if __name__ == "__main__":
