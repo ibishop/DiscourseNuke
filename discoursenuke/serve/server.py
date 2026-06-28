@@ -4,7 +4,7 @@ Serves the did:web document and the two XRPC endpoints Bluesky needs. It only
 reads pre-classified posts from SQLite — no model is loaded here, so responses
 are fast.
 
-Run:  uvicorn server:app --host 0.0.0.0 --port 8080
+Run:  uvicorn discoursenuke.serve.server:app --host 0.0.0.0 --port 8080
 """
 
 from __future__ import annotations
@@ -12,8 +12,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 
-import config
-import db
+from .. import config, db
 
 app = FastAPI(title="DiscourseNuke Feed Generator")
 

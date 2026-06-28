@@ -5,7 +5,7 @@ a minority of the timeline, so reaching N mutual posts means scanning a larger
 slice of the home timeline (bounded by --scan).
 
 Usage:
-    python fetch_mutuals.py --limit 2000 --scan 20000
+    python -m discoursenuke.pipeline.fetch_mutuals --limit 2000 --scan 20000
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from auth import get_client
-from bluesky import get_mutuals, get_timeline
+from ..auth import get_client
+from ..bluesky import get_mutuals, get_timeline
 
 OUT_DIR = Path("feed_data")
 

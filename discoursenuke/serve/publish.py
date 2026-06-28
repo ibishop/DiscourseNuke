@@ -5,8 +5,8 @@ service DID (did:web:<tunnel-host>). Re-run this whenever the tunnel hostname
 (and thus the service DID) changes — same rkey means it updates in place.
 
 Usage:
-    python publish_feed.py            # publish/update
-    python publish_feed.py --unpublish
+    python -m discoursenuke.serve.publish            # publish/update
+    python -m discoursenuke.serve.publish --unpublish
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ import argparse
 
 from atproto import models
 
-import config
-from auth import get_client
+from .. import config
+from ..auth import get_client
 
 
 def main() -> None:

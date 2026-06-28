@@ -5,7 +5,7 @@ app.bsky.feed.post records from our mutuals (via wantedDids), classifies each
 post, and persists only the non-political ones to SQLite. The server reads from
 that same DB.
 
-Run:  python -m indexer   (or: python indexer.py)
+Run:  python -m discoursenuke.classify.indexer
 """
 
 from __future__ import annotations
@@ -16,9 +16,8 @@ from datetime import datetime, timedelta, timezone
 
 import websockets
 
-import config
-import db
-from classifier import PoliticalClassifier
+from .. import config, db
+from .classifier import PoliticalClassifier
 
 BATCH_SIZE = 32
 FLUSH_INTERVAL = 1.0   # seconds

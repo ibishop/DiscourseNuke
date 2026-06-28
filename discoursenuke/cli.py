@@ -1,8 +1,8 @@
 """DiscourseNuke PoC: pull Bluesky posts and nuke US political discourse.
 
 Usage:
-    python main.py --actor someone.bsky.social --limit 50
-    python main.py --actor someone.bsky.social --threshold 0.05 --show-kept
+    python -m discoursenuke.cli --actor someone.bsky.social --limit 50
+    python -m discoursenuke.cli --actor someone.bsky.social --threshold 0.05 --show-kept
 
 With no --actor, runs against a small built-in sample feed so you can sanity
 check the classifier offline (no network, but still downloads the model once).
@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import argparse
 
-from bluesky import Post, get_author_feed, get_mutuals, get_timeline
-from classifier import PoliticalClassifier
+from .bluesky import Post, get_author_feed, get_mutuals, get_timeline
+from .classify.classifier import PoliticalClassifier
 
 SAMPLE_FEED = [
     Post("demo", "Congress just passed the new spending bill along party lines.", "", ""),
@@ -50,7 +50,7 @@ def main() -> None:
         print("Using built-in sample feed.")
         posts = SAMPLE_FEED
     else:  # default: authenticated home timeline
-        from auth import get_client
+        from .auth import get_client
 
         client = get_client()
         mutual_dids = None

@@ -66,9 +66,9 @@ Verdict: not quite what we're looking for — revisit the approach.
   a two-tab browsable feed (cleaned vs nuked).
 
 Pipeline to reproduce:
-    python fetch_mutuals.py    # -> feed_data/mutuals_feed.json
-    python filter_feed.py      # -> feed_data/filtered_feed.json + nuked_feed.json
-    python render_html.py      # -> html_view/index.html
+    python -m discoursenuke.pipeline.fetch_mutuals  # -> feed_data/mutuals_feed.json
+    python -m discoursenuke.pipeline.filter_feed    # -> filtered_feed.json + nuked_feed.json
+    python -m discoursenuke.pipeline.render_html    # -> html_view/index.html
 
 Decisions:
 - **Embedding-only, threshold 0.08.** We accept that passing name-drops in
@@ -81,28 +81,39 @@ Decisions:
 A real, pinnable Bluesky feed: "my mutuals, minus US politics." Verified locally
 end-to-end (server endpoints + live Jetstream indexing).
 
+Package layout (serving isolated from classification):
+    discoursenuke/
+      config.py  db.py  auth.py  bluesky.py   # shared core
+      classify/   classifier.py  indexer.py   # ML side (sentence-transformers)
+      serve/      server.py      publish.py   # serving side (no ML import)
+      pipeline/   fetch_mutuals  filter_feed  render_html  seed_db
+      cli.py
+`serve/` and `classify/` both depend on the shared core but NEVER on each other.
+Verified: importing `discoursenuke.serve.server` loads zero ML libraries.
+
 Architecture — two processes share `feed_data/feed.db` (SQLite, WAL):
-- `indexer.py` — streams Jetstream filtered to mutual DIDs (`wantedDids`),
-  classifies each post, stores only non-political ones. Reconnect + hourly prune
-  to RETENTION_DAYS.
-- `server.py` — FastAPI; serves `/.well-known/did.json`,
+- `classify/indexer.py` — streams Jetstream filtered to mutual DIDs
+  (`wantedDids`), classifies each post, stores only non-political ones.
+  Reconnect + hourly prune to RETENTION_DAYS.
+- `serve/server.py` — FastAPI; serves `/.well-known/did.json`,
   `app.bsky.feed.getFeedSkeleton` (keyset cursor), `describeFeedGenerator`.
   No model loaded → fast reads.
-- `publish_feed.py` — writes the `app.bsky.feed.generator` record to your repo.
-- `seed_db.py` — preloads feed.db from `filtered_feed.json` so it isn't empty.
+- `serve/publish.py` — writes the `app.bsky.feed.generator` record to your repo.
+- `pipeline/seed_db.py` — preloads feed.db from `filtered_feed.json`.
 - `config.py` / `db.py` — env+constants and the SQLite wrapper.
 
 Identity: `did:web:<tunnel-host>`; hosting: local + cloudflared/ngrok tunnel.
 
 Runbook:
-    python fetch_mutuals.py                       # refresh mutuals.json
-    cloudflared tunnel --url http://localhost:8080  # note the https host
+    python -m discoursenuke.pipeline.fetch_mutuals   # refresh mutuals.json
+    cloudflared tunnel --url http://localhost:8080   # note the https host
     # put host in .env as FEEDGEN_HOSTNAME
-    python seed_db.py                             # optional warm start
-    python indexer.py                             # terminal 1 (live indexing)
-    uvicorn server:app --host 0.0.0.0 --port 8080 # terminal 2
-    python publish_feed.py                        # then set FEEDGEN_PUBLISHER_DID in .env, restart server
+    python -m discoursenuke.pipeline.seed_db         # optional warm start
+    python -m discoursenuke.classify.indexer         # terminal 1 (live indexing)
+    uvicorn discoursenuke.serve.server:app --host 0.0.0.0 --port 8080  # terminal 2
+    python -m discoursenuke.serve.publish            # then set FEEDGEN_PUBLISHER_DID, restart server
     # pin in app: https://bsky.app/profile/<you>/feed/discoursenuke
 
 Caveat: cloudflared quick-tunnel host changes each restart → re-run
-publish_feed.py. Use a named tunnel / reserved domain for a stable did:web.
+`discoursenuke.serve.publish`. Use a named tunnel / reserved domain for a stable
+did:web.

@@ -65,8 +65,9 @@ def load_mutual_dids() -> list[str]:
     """Return the list of mutual DIDs from feed_data/mutuals.json."""
     if not MUTUALS_PATH.exists():
         raise SystemExit(
-            f"{MUTUALS_PATH} not found. Run `python fetch_mutuals.py` first to "
-            "build the mutuals list."
+            f"{MUTUALS_PATH} not found. Run "
+            "`python -m discoursenuke.pipeline.fetch_mutuals` first to build the "
+            "mutuals list."
         )
     data = json.loads(MUTUALS_PATH.read_text())
     return list(data.keys())

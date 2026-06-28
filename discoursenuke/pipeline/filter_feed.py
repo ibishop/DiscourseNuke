@@ -5,7 +5,7 @@ Loads feed_data/mutuals_feed.json, classifies every post, and writes:
   - feed_data/nuked_feed.json     -> what was removed (for inspection)
 
 Usage:
-    python filter_feed.py --threshold 0.08
+    python -m discoursenuke.pipeline.filter_feed --threshold 0.08
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import argparse
 import json
 from pathlib import Path
 
-from classifier import PoliticalClassifier
+from ..classify.classifier import PoliticalClassifier
 
 DATA = Path("feed_data")
 SRC = DATA / "mutuals_feed.json"
