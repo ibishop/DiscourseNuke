@@ -19,8 +19,8 @@ import numpy as np
 
 from .. import config
 from ..classify.embedder import Embedder
-from ..classify.topics import (COMMENTARY_SEEDS, NEUTRAL_SEEDS, NEWS_SEEDS,
-                               TOPICS)
+from ..classify.topics import (CHATTER_SEEDS, COMMENTARY_SEEDS, NEUTRAL_SEEDS,
+                               NEWS_SEEDS, TOPICS)
 
 
 def nearest(posts: np.ndarray, seeds: np.ndarray) -> np.ndarray:
@@ -47,34 +47,35 @@ def main() -> None:
     neutral = nearest(emb, e.encode(NEUTRAL_SEEDS))
     news = nearest(emb, e.encode(NEWS_SEEDS))
     comm = nearest(emb, e.encode(COMMENTARY_SEEDS))
+    chat = nearest(emb, e.encode(CHATTER_SEEDS))
 
     best = topic_scores.argmax(axis=1)
     best_score = topic_scores.max(axis=1)
     is_topic = (best_score - neutral) >= args.threshold
-    is_news = news >= comm
+    # 3-way type axis: news vs substantive commentary vs chatter/filler.
+    type_idx = np.stack([news, comm, chat], axis=1).argmax(axis=1)  # 0 news,1 comm,2 chat
+    TYPES = ["news", "commentary", "chatter"]
 
     n = len(texts)
     print(f"\nTopic counts (threshold {args.threshold}):")
     print(f"  {'neutral':<18}: {int((~is_topic).sum()):>6}  ({100*(~is_topic).mean():.1f}%)")
     for ti, t in enumerate(topic_names):
         mask = is_topic & (best == ti)
-        nnews = int((mask & is_news).sum())
-        ncomm = int((mask & ~is_news).sum())
-        print(f"  {t:<18}: {int(mask.sum()):>6}  ({100*mask.mean():.1f}%)   "
-              f"news {nnews} / commentary {ncomm}")
+        parts = " / ".join(f"{TYPES[k]} {int((mask & (type_idx==k)).sum())}" for k in range(3))
+        print(f"  {t:<18}: {int(mask.sum()):>6}  ({100*mask.mean():.1f}%)   {parts}")
 
-    def show(ti, want_news, title):
-        # Rank by topic affinity (most central to the topic), filtered by type.
-        mask = is_topic & (best == ti) & (is_news == want_news)
+    def show(ti, type_k, title):
+        # Most-central-to-topic posts of a given type.
+        mask = is_topic & (best == ti) & (type_idx == type_k)
         order = [i for i in np.argsort(-best_score) if mask[i]][: args.show]
         print(f"\n=== {title} ===")
         for i in order:
             print(f"  @{meta[i]['author']}: {texts[i][:88].replace(chr(10),' ')}")
 
     for ti, t in enumerate(topic_names):
-        if t in ("ai", "finance"):  # the newly added topics — show both types
-            show(ti, True, f"{t.upper()} NEWS")
-            show(ti, False, f"{t.upper()} COMMENTARY")
+        if t in ("us_politics", "ai"):  # spot-check news vs commentary per topic
+            show(ti, 0, f"{t.upper()} NEWS")
+            show(ti, 1, f"{t.upper()} COMMENTARY")
 
 
 if __name__ == "__main__":

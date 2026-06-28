@@ -55,18 +55,33 @@ NEWS_SEEDS = [
     "The organization launched the initiative this week.",
 ]
 
-# Domain-general: takes / opinion / discourse-about-the-topic.
+# Domain-general: SUBSTANTIVE opinion / analysis / argument about a subject.
 COMMENTARY_SEEDS = [
-    "Hot take: this whole thing is wildly overhyped.",
-    "Everyone online is overreacting to this, as usual.",
-    "I think the real problem is how we talk about this.",
-    "My honest opinion is that this approach is misguided.",
-    "The discourse around this is exhausting and misses the point.",
-    "People keep saying this but they don't get how it works.",
-    "The way the media covers this tells you everything.",
-    "It's wild how the narrative around this keeps shifting.",
-    "Unpopular opinion, but I don't think this matters at all.",
-    "This is just more proof of what I've been saying for years.",
+    "I think this policy will backfire, and here is the reason why.",
+    "The fundamental problem with this approach is the incentives it creates.",
+    "This ruling sets a dangerous precedent for the years ahead.",
+    "My read is that the market has gotten this completely wrong.",
+    "What everyone is missing is the structural cause behind this.",
+    "The argument that this will work does not hold up to scrutiny.",
+    "This is overhyped and will not live up to the expectations.",
+    "The strategy here is misguided and likely to fail.",
+    "This reflects a deeper problem with how the institution operates.",
+    "The real lesson is that we keep repeating the same mistake.",
+]
+
+# Domain-general: low-content chatter / online-meta / generic replies.
+# Exists to ABSORB filler so it isn't misread as commentary.
+CHATTER_SEEDS = [
+    "lol this is so true.",
+    "I'm always saying this.",
+    "this is literally me.",
+    "everyone is way too online these days.",
+    "honestly idk how any of this works.",
+    "just general discourse i guess.",
+    "log off and go touch grass.",
+    "haha yeah exactly, same.",
+    "the For You feed is so weird.",
+    "anyway, that's my whole point.",
 ]
 
 # topic name -> seeds
@@ -78,4 +93,4 @@ TOPICS = {
 }
 
 __all__ = ["TOPICS", "NEUTRAL_SEEDS", "NEWS_SEEDS", "COMMENTARY_SEEDS",
-           "AI_SEEDS", "FINANCE_SEEDS"]
+           "CHATTER_SEEDS", "AI_SEEDS", "FINANCE_SEEDS"]
