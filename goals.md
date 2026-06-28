@@ -62,6 +62,13 @@ Verdict: not quite what we're looking for — revisit the approach.
   git-ignored): `mutuals_feed.json` (2000 posts) + `mutuals.json`.
 - `filter_feed.py` classifies that corpus and writes `filtered_feed.json`
   (cleaned) + `nuked_feed.json` (removed).
+- `render_html.py` renders those into `html_view/index.html` (git-ignored) —
+  a two-tab browsable feed (cleaned vs nuked).
+
+Pipeline to reproduce:
+    python fetch_mutuals.py    # -> feed_data/mutuals_feed.json
+    python filter_feed.py      # -> feed_data/filtered_feed.json + nuked_feed.json
+    python render_html.py      # -> html_view/index.html
 
 Decisions:
 - **Embedding-only, threshold 0.08.** We accept that passing name-drops in
