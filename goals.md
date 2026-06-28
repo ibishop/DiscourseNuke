@@ -76,3 +76,33 @@ Decisions:
   cleaner precision over true "any mention." A keyword/entity gazetteer was
   considered for higher recall but deliberately NOT adopted.
 - At 0.08: ~6.4% of the corpus (128/2000) removed as US political.
+
+## Live custom feed (Bluesky feed generator)
+A real, pinnable Bluesky feed: "my mutuals, minus US politics." Verified locally
+end-to-end (server endpoints + live Jetstream indexing).
+
+Architecture — two processes share `feed_data/feed.db` (SQLite, WAL):
+- `indexer.py` — streams Jetstream filtered to mutual DIDs (`wantedDids`),
+  classifies each post, stores only non-political ones. Reconnect + hourly prune
+  to RETENTION_DAYS.
+- `server.py` — FastAPI; serves `/.well-known/did.json`,
+  `app.bsky.feed.getFeedSkeleton` (keyset cursor), `describeFeedGenerator`.
+  No model loaded → fast reads.
+- `publish_feed.py` — writes the `app.bsky.feed.generator` record to your repo.
+- `seed_db.py` — preloads feed.db from `filtered_feed.json` so it isn't empty.
+- `config.py` / `db.py` — env+constants and the SQLite wrapper.
+
+Identity: `did:web:<tunnel-host>`; hosting: local + cloudflared/ngrok tunnel.
+
+Runbook:
+    python fetch_mutuals.py                       # refresh mutuals.json
+    cloudflared tunnel --url http://localhost:8080  # note the https host
+    # put host in .env as FEEDGEN_HOSTNAME
+    python seed_db.py                             # optional warm start
+    python indexer.py                             # terminal 1 (live indexing)
+    uvicorn server:app --host 0.0.0.0 --port 8080 # terminal 2
+    python publish_feed.py                        # then set FEEDGEN_PUBLISHER_DID in .env, restart server
+    # pin in app: https://bsky.app/profile/<you>/feed/discoursenuke
+
+Caveat: cloudflared quick-tunnel host changes each restart → re-run
+publish_feed.py. Use a named tunnel / reserved domain for a stable did:web.

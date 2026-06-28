@@ -3,3 +3,6 @@ numpy>=1.24
 requests>=2.31
 atproto>=0.0.55
 python-dotenv>=1.0
+fastapi>=0.110
+uvicorn[standard]>=0.27
+websockets>=12.0
