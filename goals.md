@@ -56,3 +56,16 @@ What we learned:
 
 Verdict: not quite what we're looking for — revisit the approach.
 (TODO: capture what we *do* want the matching to look like.)
+
+## Current goal — filter US politics from the stored corpus
+- `fetch_mutuals.py` builds a local corpus in `feed_data/` (mutuals-only,
+  git-ignored): `mutuals_feed.json` (2000 posts) + `mutuals.json`.
+- `filter_feed.py` classifies that corpus and writes `filtered_feed.json`
+  (cleaned) + `nuked_feed.json` (removed).
+
+Decisions:
+- **Embedding-only, threshold 0.08.** We accept that passing name-drops in
+  otherwise-casual sentences (a lone "Boebert"/"Pelosi") slip through — chose
+  cleaner precision over true "any mention." A keyword/entity gazetteer was
+  considered for higher recall but deliberately NOT adopted.
+- At 0.08: ~6.4% of the corpus (128/2000) removed as US political.
