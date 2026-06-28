@@ -1,14 +1,16 @@
-"""Embedding-based classifier for US political discourse.
+"""Embedding-based classifier for *US* political discourse.
 
 Approach (PoC, no quantization yet):
   - Embed each post with a local sentence-transformers model.
-  - Keep two small reference sets: US-political seeds and neutral seeds.
-  - Score a post by how much closer it sits to the political seeds than to
-    the neutral seeds (contrastive cosine similarity).
-  - A post is "political" when that margin clears a threshold.
+  - Keep three small reference sets: US-political, FOREIGN-political, and
+    neutral seeds.
+  - Score a post by its nearest seed (max cosine) within each set.
+  - A post is "US political" only when it is closest to the US-political set,
+    beating both the foreign-political and neutral sets by a margin.
 
-This is intentionally simple so we can see whether the embedding space alone
-separates US politics before adding clustering / tokenization.
+The foreign-political set is the key to geography: posts about UK/Canada/EU
+politics are political, so they'd beat the neutral set — but they should land
+closer to the foreign anchors than the US ones, so they're NOT nuked.
 """
 
 from __future__ import annotations
@@ -20,27 +22,46 @@ import numpy as np
 
 MODEL_NAME = "all-MiniLM-L6-v2"
 
-# Seed phrases that exemplify US political discourse. These are the "positive"
-# anchors. Broad coverage matters more than precision here.
-POLITICAL_SEEDS = [
-    "The president signed a new executive order today.",
-    "Congress is debating the federal budget and a government shutdown.",
-    "Republicans and Democrats clashed over the new bill in the Senate.",
-    "The Supreme Court issued a ruling on abortion rights.",
-    "Voters head to the polls in the upcoming midterm elections.",
-    "Trump rallied supporters ahead of the primary.",
-    "Biden's administration announced a new immigration policy.",
-    "The governor signed legislation on gun control.",
-    "Debate over taxes, tariffs, and the economy dominated the campaign.",
-    "Protesters gathered at the Capitol over the new policy.",
-    "The senator introduced a bill to reform healthcare.",
-    "Polling shows a tight race between the two candidates.",
-    "The House passed a resolution along party lines.",
-    "Discussion of MAGA, the GOP, and progressive Democrats.",
-    "Election integrity and voter ID laws are being contested in court.",
+# US political discourse — entity-rich on purpose so geography is encoded.
+US_POLITICAL_SEEDS = [
+    "President Trump signed an executive order from the White House.",
+    "Biden's administration announced a new federal immigration policy.",
+    "Congress and the Senate debated the federal budget on Capitol Hill.",
+    "The Supreme Court (SCOTUS) issued a major ruling on abortion rights.",
+    "Republicans and Democrats clashed over the bill in the US House.",
+    "GOP and MAGA supporters rallied ahead of the Republican primary.",
+    "DHS and ICE agents carried out immigration enforcement raids.",
+    "Voters head to the polls in the US midterm and presidential elections.",
+    "The governor signed a state law on gun control.",
+    "Medicare for All (M4A) and US healthcare reform in Congress.",
+    "Progressive Democrats and the DSA won a House primary.",
+    "JD Vance and the Republican ticket campaigned in swing states.",
+    "American politics dominated the news from Washington, DC.",
+    "Senator Chris Murphy introduced a bill in the Senate.",
+    "Voter fraud, the SAVE Act, and US election integrity laws.",
+    "The filibuster and procedure in the United States Senate.",
 ]
 
-# Seed phrases for ordinary, non-political content. The "negative" anchors.
+# Political discourse from OTHER countries. These exist to absorb non-US
+# politics so it doesn't get misfiled as US politics.
+FOREIGN_POLITICAL_SEEDS = [
+    "The UK Prime Minister and the Chancellor of the Exchequer.",
+    "Labour, the Tories, and Reform UK debated in Parliament.",
+    "Margaret Thatcher's council house policy and the Conservatives.",
+    "Westminster and Downing Street politics in Britain.",
+    "Keir Starmer's Labour government announced a new policy.",
+    "Canada's Prime Minister and Parliament in Ottawa.",
+    "Canadian federal policy and the provinces like Ontario.",
+    "The European Union and the European Parliament in Brussels.",
+    "France's National Assembly and the French political spectrum.",
+    "Austria's communist party won local elections in Graz.",
+    "Mexico's president rolled out universal healthcare.",
+    "German federal politics and the Bundestag in Berlin.",
+    "Australia's parliament and the prime minister in Canberra.",
+    "The Scottish, Welsh, and Northern Irish devolved governments.",
+]
+
+# Ordinary, non-political content.
 NEUTRAL_SEEDS = [
     "I just baked sourdough bread for the first time.",
     "Check out this photo of my cat sleeping in the sun.",
@@ -62,53 +83,59 @@ NEUTRAL_SEEDS = [
 
 @dataclass
 class Verdict:
-    is_political: bool
-    score: float  # margin: political_similarity - neutral_similarity
+    is_political: bool           # specifically US political (the nuke decision)
+    score: float                 # us - max(foreign, neutral); margin of confidence
+    us: float                    # nearest-seed similarity to US-political set
+    foreign: float               # nearest-seed similarity to foreign-political set
+    neutral: float               # nearest-seed similarity to neutral set
+    label: str                   # 'us_political' | 'foreign_political' | 'neutral'
 
 
 class PoliticalClassifier:
-    def __init__(self, threshold: float = 0.05, model_name: str = MODEL_NAME):
+    def __init__(self, threshold: float = 0.08, model_name: str = MODEL_NAME):
+        # threshold = how much US must beat the best competing set by.
+        # ~0.08 drops the near-zero-margin noise (posts not close to anything)
+        # while keeping genuine US-political posts, which score 0.08+.
         self.threshold = threshold
         self.model_name = model_name
 
     @cached_property
     def _model(self):
-        # Imported lazily so importing this module is cheap.
         from sentence_transformers import SentenceTransformer
 
         return SentenceTransformer(self.model_name)
 
     @cached_property
-    def _political_proto(self) -> np.ndarray:
-        return self._encode(POLITICAL_SEEDS).mean(axis=0)
+    def _us(self) -> np.ndarray:
+        return self._encode(US_POLITICAL_SEEDS)
 
     @cached_property
-    def _neutral_proto(self) -> np.ndarray:
-        return self._encode(NEUTRAL_SEEDS).mean(axis=0)
+    def _foreign(self) -> np.ndarray:
+        return self._encode(FOREIGN_POLITICAL_SEEDS)
+
+    @cached_property
+    def _neutral(self) -> np.ndarray:
+        return self._encode(NEUTRAL_SEEDS)
 
     def _encode(self, texts: list[str]) -> np.ndarray:
         return self._model.encode(texts, normalize_embeddings=True)
 
-    @staticmethod
-    def _cos(a: np.ndarray, b: np.ndarray) -> float:
-        # Inputs are already L2-normalized, so dot product == cosine sim.
-        return float(np.dot(a, b))
+    def _verdict(self, vec: np.ndarray) -> Verdict:
+        # Inputs are L2-normalized, so a matrix-vector dot gives cosine sims.
+        us = float(self._us.dot(vec).max())
+        foreign = float(self._foreign.dot(vec).max())
+        neutral = float(self._neutral.dot(vec).max())
+
+        scores = {"us_political": us, "foreign_political": foreign, "neutral": neutral}
+        label = max(scores, key=scores.get)
+        margin = us - max(foreign, neutral)
+        is_us = label == "us_political" and margin >= self.threshold
+        return Verdict(is_us, margin, us, foreign, neutral, label)
 
     def classify(self, text: str) -> Verdict:
-        vec = self._encode([text])[0]
-        pol = self._cos(vec, self._political_proto)
-        neu = self._cos(vec, self._neutral_proto)
-        margin = pol - neu
-        return Verdict(is_political=margin >= self.threshold, score=margin)
+        return self._verdict(self._encode([text])[0])
 
     def classify_many(self, texts: list[str]) -> list[Verdict]:
         if not texts:
             return []
-        vecs = self._encode(texts)
-        out = []
-        for vec in vecs:
-            pol = self._cos(vec, self._political_proto)
-            neu = self._cos(vec, self._neutral_proto)
-            margin = pol - neu
-            out.append(Verdict(is_political=margin >= self.threshold, score=margin))
-        return out
+        return [self._verdict(v) for v in self._encode(texts)]

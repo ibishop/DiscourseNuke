@@ -38,7 +38,7 @@ def main() -> None:
     ap.add_argument("--timeline", action="store_true", help="Pull your authenticated home timeline.")
     ap.add_argument("--sample", action="store_true", help="Use the built-in offline sample feed.")
     ap.add_argument("--limit", type=int, default=50, help="Max posts to pull.")
-    ap.add_argument("--threshold", type=float, default=0.05, help="Political margin threshold.")
+    ap.add_argument("--threshold", type=float, default=0.08, help="US-political margin threshold.")
     ap.add_argument("--show-kept", action="store_true", help="Also print kept (non-political) posts.")
     args = ap.parse_args()
 
