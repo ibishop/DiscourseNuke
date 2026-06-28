@@ -6,3 +6,4 @@ python-dotenv>=1.0
 fastapi>=0.110
 uvicorn[standard]>=0.27
 websockets>=12.0
+einops>=0.7  # required by nomic-embed-text model code

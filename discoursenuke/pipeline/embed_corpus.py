@@ -26,12 +26,17 @@ from ..classify.embedder import Embedder
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Embed the mutuals corpus.")
+    ap.add_argument("--model", default="minilm", choices=["minilm", "nomic"],
+                    help="Embedding model preset.")
     ap.add_argument("--src", default=str(config.DATA_DIR / "mutuals_corpus.jsonl"))
-    ap.add_argument("--out", default=str(config.DATA_DIR / "corpus_emb.npy"))
-    ap.add_argument("--meta", default=str(config.DATA_DIR / "corpus_emb_meta.jsonl"))
+    ap.add_argument("--out", default="", help="Output .npy (default: corpus_emb_<model>.npy).")
+    ap.add_argument("--meta", default="", help="Output meta JSONL (default: corpus_emb_<model>_meta.jsonl).")
     ap.add_argument("--batch-size", type=int, default=256)
     ap.add_argument("--limit", type=int, default=0, help="Only embed the first N posts (0 = all).")
     args = ap.parse_args()
+
+    args.out = args.out or str(config.DATA_DIR / f"corpus_emb_{args.model}.npy")
+    args.meta = args.meta or str(config.DATA_DIR / f"corpus_emb_{args.model}_meta.jsonl")
 
     src = Path(args.src)
     if not src.exists():
@@ -48,9 +53,9 @@ def main() -> None:
             if args.limit and len(records) >= args.limit:
                 break
     texts = [r["text"] for r in records]
-    print(f"Loaded {len(texts)} posts. Embedding (batch={args.batch_size}) ...")
+    print(f"Loaded {len(texts)} posts. Embedding with '{args.model}' (batch={args.batch_size}) ...")
 
-    embedder = Embedder()
+    embedder = Embedder(preset=args.model)
     start = time.time()
     vecs = embedder.encode(texts, batch_size=args.batch_size, show_progress=True)
     elapsed = time.time() - start
