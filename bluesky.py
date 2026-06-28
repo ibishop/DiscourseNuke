@@ -22,8 +22,29 @@ class Post:
     created_at: str
 
 
+def get_mutuals(client) -> dict[str, str]:
+    """Return {did: handle} for mutuals — people you follow who follow you back."""
+    me = client.me.did
+
+    def collect(fn, key) -> dict[str, str]:
+        out: dict[str, str] = {}
+        cursor = None
+        while True:
+            resp = fn(actor=me, cursor=cursor, limit=100)
+            for u in getattr(resp, key):
+                out[u.did] = u.handle
+            cursor = resp.cursor
+            if not cursor:
+                break
+        return out
+
+    follows = collect(client.get_follows, "follows")
+    followers = collect(client.get_followers, "followers")
+    return {did: h for did, h in follows.items() if did in followers}
+
+
 def get_timeline(client, limit: int | None = 50, since_days: int | None = None,
-                 max_posts: int = 5000) -> list[Post]:
+                 max_posts: int = 5000, authors: set[str] | None = None) -> list[Post]:
     """Fetch the authenticated user's home timeline (posts from follows).
 
     Requires a logged-in atproto Client (see auth.get_client). This is the
@@ -42,8 +63,10 @@ def get_timeline(client, limit: int | None = 50, since_days: int | None = None,
     posts: list[Post] = []
     cursor = None
     while len(posts) < max_posts:
+        # Use full pages when filtering by date or author (we may discard most
+        # of a page); otherwise size the page to what's still needed.
         page_size = 100
-        if limit is not None and since_days is None:
+        if limit is not None and since_days is None and authors is None:
             page_size = min(100, limit - len(posts))
             if page_size <= 0:
                 break
@@ -51,9 +74,13 @@ def get_timeline(client, limit: int | None = 50, since_days: int | None = None,
         reached_cutoff = False
         for item in resp.feed:
             post = item.post
+            if authors is not None and post.author.did not in authors:
+                continue
             text = getattr(post.record, "text", "") or ""
             if not text:
                 continue
+            if limit is not None and since_days is None and len(posts) >= limit:
+                return posts[:limit]
             created = getattr(post.record, "created_at", "") or ""
             # Effective "when I'd have seen it" time for the cutoff. For a repost
             # that's item.reason.indexed_at; otherwise the post's own indexed_at.

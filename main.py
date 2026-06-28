@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import argparse
 
-from bluesky import Post, get_author_feed, get_timeline
+from bluesky import Post, get_author_feed, get_mutuals, get_timeline
 from classifier import PoliticalClassifier
 
 SAMPLE_FEED = [
@@ -36,6 +36,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Nuke US political discourse from a Bluesky feed.")
     ap.add_argument("--actor", help="Pull a specific user's public author feed.")
     ap.add_argument("--timeline", action="store_true", help="Pull your authenticated home timeline.")
+    ap.add_argument("--mutuals", action="store_true", help="Only keep posts from mutuals (you follow each other).")
     ap.add_argument("--sample", action="store_true", help="Use the built-in offline sample feed.")
     ap.add_argument("--limit", type=int, default=50, help="Max posts to pull.")
     ap.add_argument("--threshold", type=float, default=0.08, help="US-political margin threshold.")
@@ -51,9 +52,16 @@ def main() -> None:
     else:  # default: authenticated home timeline
         from auth import get_client
 
-        print(f"Pulling up to {args.limit} posts from your home timeline ...")
         client = get_client()
-        posts = get_timeline(client, limit=args.limit)
+        mutual_dids = None
+        if args.mutuals:
+            print("Computing mutuals (follows ∩ followers) ...")
+            mutuals = get_mutuals(client)
+            mutual_dids = set(mutuals)
+            print(f"  {len(mutual_dids)} mutuals.")
+        scope = "mutuals-only timeline" if args.mutuals else "home timeline"
+        print(f"Pulling up to {args.limit} posts from your {scope} ...")
+        posts = get_timeline(client, limit=args.limit, authors=mutual_dids)
 
     print(f"Loaded {len(posts)} posts. Loading model + classifying ...\n")
 
