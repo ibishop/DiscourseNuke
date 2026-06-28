@@ -11,6 +11,7 @@ venv/
 
 # Pulled feed data (may contain private timeline)
 timeline_cache.json
+feed_data/
 
 # IDE
 .idea/
